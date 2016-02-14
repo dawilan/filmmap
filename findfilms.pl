@@ -35,8 +35,13 @@ foreach my $movie ( @{ $movies->{'list'} } ) {
     is_duplicate($movie);
 }
 
-print Dumper $movies->{'duplicates'}[0];
-print "Gigs of Duplicates: " . $movies->{'total_duplicate_size'} / (1024 * 1024 * 1024) . "\n";
+## Printing to user ##
+
+print "\n";
+print 'Number of Duplicates: ' . scalar @{ $movies->{'duplicates'} } . "\n";
+printf "Gigs of Duplicates: %.2f\n",
+  $movies->{'total_duplicate_size'} / ( 1024 * 1024 * 1024 );
+print "\n";
 
 sub is_duplicate {
     my ($movie) = @_;
