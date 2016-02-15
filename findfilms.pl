@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 # findfilms.pl - quick video file management
+# davehhpnet < dave@thehhp.net >
 
 ## Includes
 
