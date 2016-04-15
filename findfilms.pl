@@ -9,9 +9,11 @@ use Data::Dumper;    ## DEBUG
 #my @dirs   = qw( /media2/movies /media3/movies /media4/movies /media/tv );
 my @dirs = qw( /media/tv );    ## DEBUG
 
-my $videos          = {};
+my $videos = {};
+
 my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts$/;
-my ( $show_list, $verbose, $sort_by_size, $find_duplicates );
+my ( $show_list, $verbose, $sort_by_size, $find_duplicates, $trash_collect,
+    $samples );
 
 ## Get user supplied args
 my @ARGS = @_;
@@ -20,6 +22,8 @@ $verbose         = 1 if ( grep /--verbose/,         @ARGV );
 $show_list       = 1 if ( grep /--list/,            @ARGV );
 $sort_by_size    = 1 if ( grep /--sort_by_size/,    @ARGV );
 $find_duplicates = 1 if ( grep /--find_duplicates/, @ARGV );
+$trash_collect   = 1 if ( grep /--trash_collect/,   @ARGV );
+$find_samples    = 1 if ( grep /--find_samples/,    @ARGV );
 
 print "# show_list is enabled\n"       if $show_list       && $verbose;
 print "# verbose is enabled\n"         if $verbose;
@@ -28,19 +32,45 @@ print "# find_duplicates is enabled\n" if $find_duplicates && $verbose;
 
 find(
     sub {
-        -f
-          && $extension_regex
-          && push(
-            @{ $videos->{'list'} },
-            Video->new(
-                {
-                    name => $_,
-                    dir  => $File::Find::dir,
-                    path => $File::Find::name,
-                    size => -s $_,
-                }
-            )
-          );
+        if ( -f && /$extension_regex/ ) {
+            push(
+                @{ $videos->{'list'} },
+                Video->new(
+                    {
+                        name => $_,
+                        dir  => $File::Find::dir,
+                        path => $File::Find::name,
+                        size => -s $_,
+                    }
+                )
+            );
+        }
+        if ( -f && !/$extension_regex/ ) {
+            push(
+                @{ $videos->{'trash_list'} },
+                Video->new(
+                    {
+                        name => $_,
+                        dir  => $File::Find::dir,
+                        path => $File::Find::name,
+                        size => -s $_,
+                    }
+                )
+            );
+        }
+        if ( -f && /sample/i ) {
+            push(
+                @{ $videos->{'sample_list'} },
+                Video->new(
+                    {
+                        name => $_,
+                        dir  => $File::Find::dir,
+                        path => $File::Find::name,
+                        size => -s $_,
+                    }
+                )
+            );
+        }
     },
     @dirs
 );
@@ -66,6 +96,17 @@ if ($find_duplicates) {
       $videos->{'total_duplicate_size'} / ( 1024 * 1024 * 1024 )
       if $verbose;
     print "\n";
+}
+
+if ($find_samples) {
+
+    #    print Dumper $videos->{'sample_list'};
+    my $total_size = 0;
+    print 'Total Sample Files: ' . scalar @{ $videos->{'sample_list'} } . "\n";
+    foreach my $sample ( @{ $videos->{'sample_list'} } ) {
+        $total_size += $sample->{'size'};
+    }
+    print 'Total Sample Size: ' . _in_gigs( $total_size ) . " GB\n";
 }
 
 sub _sort_by_size {
@@ -107,13 +148,17 @@ sub _in_gigs {
     return $gigs;
 }
 
+if ($trash_collect) {
+    print Dumper $videos->{'trash_list'};
+}
+
 if ($show_list) {
     foreach my $video ( @{ $videos->{'list'} } ) {
         print _cli_rinse( $video->{'path'} ) . "\n";
     }
 }
 
-if ( $find_duplicates ) {
+if ($find_duplicates) {
     foreach my $video ( @{ $videos->{'duplicates'} } ) {
         $video->{'size_gb'} = in_gigs( $video->{'size'} );
         if ($verbose) {
