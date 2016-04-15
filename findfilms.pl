@@ -10,23 +10,21 @@ use Data::Dumper;    ## DEBUG
 my @dirs = qw( /media/tv );    ## DEBUG
 
 my $videos          = {};
-my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts/;
-my ( $show_list, $verbose );
+my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts$/;
+my ( $show_list, $verbose, $sort_by_size, $find_duplicates );
 
 ## Get user supplied args
 my @ARGS = @_;
 
-my $arg_count = '0';
+$verbose         = 1 if ( grep /--verbose/,         @ARGV );
+$show_list       = 1 if ( grep /--list/,            @ARGV );
+$sort_by_size    = 1 if ( grep /--sort_by_size/,    @ARGV );
+$find_duplicates = 1 if ( grep /--find_duplicates/, @ARGV );
 
-foreach my $arg (@ARGV) {
-    $arg_count++;
-    print "$arg_count: $arg\n";
-    if ( $arg eq '--list' ) {
-        print "# \#show_list: enabled\n" if $verbose;
-        $show_list = 1;
-    }
-    $verbose = 1 if $arg eq '-v' or $arg eq '--verbose';
-}
+print "# show_list is enabled\n"       if $show_list       && $verbose;
+print "# verbose is enabled\n"         if $verbose;
+print "# sort_by_size is enabled\n"    if $sort_by_size    && $verbose;
+print "# find_duplicates is enabled\n" if $find_duplicates && $verbose;
 
 find(
     sub {
@@ -53,11 +51,32 @@ foreach my $video ( @{ $videos->{'list'} } ) {
 
 ## Printing to user ##
 
-print "\n";
-print 'Number of Duplicates: ' . scalar @{ $videos->{'duplicates'} } . "\n";
-printf "Gigs of Duplicates: %.2f\n",
-  $videos->{'total_duplicate_size'} / ( 1024 * 1024 * 1024 );
-print "\n";
+if ($sort_by_size) {
+    ## This needs to be written
+    my @sorted_by_size = _sort_by_size( @{ $videos->{'list'} } );
+    print "# sort_by_size called\n";
+
+    #    print Dumper \@sorted_by_size;
+}
+
+if ($find_duplicates) {
+    print "\n";
+    print 'Number of Duplicates: ' . scalar @{ $videos->{'duplicates'} } . "\n";
+    printf "Gigs of Duplicates: %.2f\n",
+      $videos->{'total_duplicate_size'} / ( 1024 * 1024 * 1024 )
+      if $verbose;
+    print "\n";
+}
+
+sub _sort_by_size {
+    my @list_to_sort = @_;
+
+    my @sorted = sort {
+
+      } @list_to_sort;
+
+      #    print Dumper \@list_to_sort;
+}
 
 sub is_duplicate {
     my ($video) = @_;
