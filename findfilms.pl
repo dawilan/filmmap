@@ -52,11 +52,11 @@ foreach my $video ( @{ $videos->{'list'} } ) {
 ## Printing to user ##
 
 if ($sort_by_size) {
-    ## This needs to be written
-    my @sorted_by_size = _sort_by_size( @{ $videos->{'list'} } );
-    print "# sort_by_size called\n";
-
-    #    print Dumper \@sorted_by_size;
+    @{ $videos->{'list_sorted_by_size'} } =
+      _sort_by_size( @{ $videos->{'list'} } );
+    foreach $video ( @{ $videos->{'list_sorted_by_size'} } ) {
+        print "$video->{'name'}\n";
+    }
 }
 
 if ($find_duplicates) {
@@ -70,12 +70,14 @@ if ($find_duplicates) {
 
 sub _sort_by_size {
     my @list_to_sort = @_;
-
-    my @sorted = sort {
-
-      } @list_to_sort;
-
-      #    print Dumper \@list_to_sort;
+    my @sorted = sort { $a->{'size'} <=> $b->{'size'}; } @list_to_sort;
+    if ($verbose) {
+        foreach my $video (@sorted) {
+            print _in_gigs( $video->{'size'} ) . ": "
+              . _cli_rinse( $video->{'path'} ) . "\n";
+        }
+    }
+    return @sorted;
 }
 
 sub is_duplicate {
@@ -86,15 +88,19 @@ sub is_duplicate {
         push( @{ $videos->{'duplicates'} }, $video );
         $videos->{'total_duplicate_size'} += $video->{'size'};
     }
-    $video->{'rel_path'} = $video->{'path'};
-    $video->{'rel_path'} =~ s{\s}{\\ }g;
-    $video->{'rel_path'} =~ s{\[}{\\[}g;
-    $video->{'rel_path'} =~ s{\]}{\\]}g;
-    $video->{'rel_path'} =~ s{\(}{\\(}g;
-    $video->{'rel_path'} =~ s{\)}{\\)}g;
 }
 
-sub in_gigs {
+sub _cli_rinse {
+    my ($path) = @_;
+    $path =~ s{\s}{\\ }g;
+    $path =~ s{\[}{\\[}g;
+    $path =~ s{\]}{\\]}g;
+    $path =~ s{\(}{\\(}g;
+    $path =~ s{\)}{\\)}g;
+    return $path;
+}
+
+sub _in_gigs {
     my ($bytes) = @_;
     my $gigs;
     $gigs = sprintf "%.2f", $bytes / ( 1024 * 1024 * 1024 );
@@ -102,8 +108,12 @@ sub in_gigs {
 }
 
 if ($show_list) {
-    my %sorted;
-    print "# \$show_list is active\n";
+    foreach my $video ( @{ $videos->{'list'} } ) {
+        print _cli_rinse( $video->{'path'} ) . "\n";
+    }
+}
+
+if ( $find_duplicates ) {
     foreach my $video ( @{ $videos->{'duplicates'} } ) {
         $video->{'size_gb'} = in_gigs( $video->{'size'} );
         if ($verbose) {
@@ -114,27 +124,6 @@ if ($show_list) {
             print "$video->{'size_gb'}: $video->{'path'}\n";
         }
     }
-}
-
-#my @sorted = sort {-s $a <=> -s $b } @{$videos->{'duplicates'}};
-
-#foreach my $val ( sort {-s $a <=> -s $b } @{$videos->{'duplicates'}} ) {
-#    print "# \$val->{'size} -> $val->{'size'}\n";
-#}
-
-#foreach my $sorted ( sort { $b <=> $a } @{$video->{'duplicates'}} ) {
-#    print $sorted . "\n";
-#}
-
-@sorted;
-
-#print Dumper $video->{'duplicates'};
-
-#print Dumper $videos->{'duplicates'};
-#print Dumper $videos->{'duplicates'};
-
-foreach my $file (@movies) {
-    print Dumper $file;
 }
 
 package Video;
