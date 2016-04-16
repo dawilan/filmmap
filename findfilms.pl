@@ -105,6 +105,16 @@ if ($find_duplicates) {
     print "\n";
 }
 
+if ($trash_collect) {
+    print Dumper $videos->{'trash_list'};
+}
+
+if ($show_list) {
+    foreach my $video ( @{ $videos->{'list'} } ) {
+        print _cli_rinse( $video->{'path'} ) . "\n";
+    }
+}
+
 if ($find_samples) {
     my $total_size = 0;
     print "\n"
@@ -114,16 +124,6 @@ if ($find_samples) {
         $total_size += $sample->{'size'};
     }
     print 'Total Sample Size: ' . _in_gigs($total_size) . " GB\n\n";
-}
-
-if ($trash_collect) {
-    print Dumper $videos->{'trash_list'};
-}
-
-if ($show_list) {
-    foreach my $video ( @{ $videos->{'list'} } ) {
-        print _cli_rinse( $video->{'path'} ) . "\n";
-    }
 }
 
 if ($find_duplicates) {
