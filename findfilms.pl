@@ -8,27 +8,34 @@ use Data::Dumper;    ## DEBUG
 
 #my @dirs   = qw( /media2/movies /media3/movies /media4/movies /media/tv );
 my @dirs = qw( /media/tv );    ## DEBUG
+## User defineable.  This respects the idea of simply moving data found to a central
+##    location for the user to sort through manually.
+my $trashbin = '/media/trashvbin/';
 
 my $videos = {};
 
 my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts$/;
-my ( $show_list, $verbose, $sort_by_size, $find_duplicates, $trash_collect,
-    $samples );
+my (
+    $show_list,       $verbose,       $sort_by_size,
+    $find_duplicates, $trash_collect, $samples,
+    $move,            $remove,        $help
+);
 
-## Get user supplied args
-my @ARGS = @_;
+$verbose         = 1 if ( grep /--verbose|-v/,                          @ARGV );
+$show_list       = 1 if ( grep /--list|-l/,                             @ARGV );
+$sort_by_size    = 1 if ( grep /--sort_by_size|--size_sort|--size/,     @ARGV );
+$find_duplicates = 1 if ( grep /--find_duplicates|--dups/,              @ARGV );
+$trash_collect   = 1 if ( grep /--trash_collect|--trash|-t/,            @ARGV );
+$find_samples    = 1 if ( grep /--find_samples|--samples|-s$/,           @ARGV );
+$remove          = 1 if ( grep /--remove|--rm|--del|--delete|--commit/, @ARGV );
+$move            = 1 if ( grep /--move|--relocate/,                     @ARGV );
+$help = 1 if ( grep /--help|-h/, @ARGV or !defined @ARGV );
 
-$verbose         = 1 if ( grep /--verbose/,         @ARGV );
-$show_list       = 1 if ( grep /--list/,            @ARGV );
-$sort_by_size    = 1 if ( grep /--sort_by_size/,    @ARGV );
-$find_duplicates = 1 if ( grep /--find_duplicates/, @ARGV );
-$trash_collect   = 1 if ( grep /--trash_collect/,   @ARGV );
-$find_samples    = 1 if ( grep /--find_samples/,    @ARGV );
+print Dumper \@ARGV;
+print "\$help -> $help\n";
+print "\$find_samples -> $find_samples\n";
 
-print "# show_list is enabled\n"       if $show_list       && $verbose;
-print "# verbose is enabled\n"         if $verbose;
-print "# sort_by_size is enabled\n"    if $sort_by_size    && $verbose;
-print "# find_duplicates is enabled\n" if $find_duplicates && $verbose;
+_print_eom() if defined $help;
 
 find(
     sub {
@@ -99,26 +106,37 @@ if ($find_duplicates) {
 }
 
 if ($find_samples) {
-
-    #    print Dumper $videos->{'sample_list'};
     my $total_size = 0;
-    print 'Total Sample Files: ' . scalar @{ $videos->{'sample_list'} } . "\n";
+    print "\n"
+      . 'Total Sample Files: '
+      . scalar @{ $videos->{'sample_list'} } . "\n";
     foreach my $sample ( @{ $videos->{'sample_list'} } ) {
         $total_size += $sample->{'size'};
     }
-    print 'Total Sample Size: ' . _in_gigs( $total_size ) . " GB\n";
+    print 'Total Sample Size: ' . _in_gigs($total_size) . " GB\n\n";
 }
 
-sub _sort_by_size {
-    my @list_to_sort = @_;
-    my @sorted = sort { $a->{'size'} <=> $b->{'size'}; } @list_to_sort;
-    if ($verbose) {
-        foreach my $video (@sorted) {
-            print _in_gigs( $video->{'size'} ) . ": "
-              . _cli_rinse( $video->{'path'} ) . "\n";
+if ($trash_collect) {
+    print Dumper $videos->{'trash_list'};
+}
+
+if ($show_list) {
+    foreach my $video ( @{ $videos->{'list'} } ) {
+        print _cli_rinse( $video->{'path'} ) . "\n";
+    }
+}
+
+if ($find_duplicates) {
+    foreach my $video ( @{ $videos->{'duplicates'} } ) {
+        $video->{'size_gb'} = in_gigs( $video->{'size'} );
+        if ($verbose) {
+            print Dumper $video;
+        }
+        else {
+            $video->{'size_gb'} = in_gigs( $video->{'size'} );
+            print "$video->{'size_gb'}: $video->{'path'}\n";
         }
     }
-    return @sorted;
 }
 
 sub is_duplicate {
@@ -148,27 +166,32 @@ sub _in_gigs {
     return $gigs;
 }
 
-if ($trash_collect) {
-    print Dumper $videos->{'trash_list'};
+sub _print_eom {
+    print "\t$!\n";
+    print "--list|-l - Print the file list.\n";
+    print
+      "--sort_by_size|--size_sort|-ss - Print the file list sorted by size.\n";
+    print "--find_duplicates|--dups - locate duplicate files.\n";
+    print
+"--trash_collect|--trash|-t - Find files considered junk like nfo, srr, or text files.\n";
+    print
+"--find_samples|--samples|-s - Find all sample files.  When used with --delete these duplicate files will be reaped.\n";
+    print
+"--remove|--rm|--del|--delete|--commit - Will act on built lists by removing the files within said list.\n";
+    print
+"--move|--relocate - Instead of removing files within the list MOVE them to a safe place.\n";
 }
 
-if ($show_list) {
-    foreach my $video ( @{ $videos->{'list'} } ) {
-        print _cli_rinse( $video->{'path'} ) . "\n";
-    }
-}
-
-if ($find_duplicates) {
-    foreach my $video ( @{ $videos->{'duplicates'} } ) {
-        $video->{'size_gb'} = in_gigs( $video->{'size'} );
-        if ($verbose) {
-            print Dumper $video;
-        }
-        else {
-            $video->{'size_gb'} = in_gigs( $video->{'size'} );
-            print "$video->{'size_gb'}: $video->{'path'}\n";
+sub _sort_by_size {
+    my @list_to_sort = @_;
+    my @sorted = sort { $a->{'size'} <=> $b->{'size'}; } @list_to_sort;
+    if ($verbose) {
+        foreach my $video (@sorted) {
+            print _in_gigs( $video->{'size'} ) . ": "
+              . _cli_rinse( $video->{'path'} ) . "\n";
         }
     }
+    return @sorted;
 }
 
 package Video;
