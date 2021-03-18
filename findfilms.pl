@@ -1,26 +1,26 @@
 #!/usr/bin/env perl
 # findfilms.pl - quick video file management
 
-## Includes
+package Video;
 
 use File::Find;
-use Data::Dumper;    ## DEBUG
+use Data::Dumper;
 
-#my @dirs   = qw( /media2/movies /media3/movies /media4/movies /media/tv );
-my @dirs = qw( /media/tv );    ## DEBUG
-## User defineable.  This respects the idea of simply moving data found to a central
-##    location for the user to sort through manually.
+my @dirs = qw( /HGST1/tv /media1/tv );    ## DEBUG
+
 my $trashbin = '/media/trashvbin/';
 
 my $videos = {};
 
-my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts$/;
+my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts$|\.webm$/;
 my (
     $show_list,       $verbose,       $sort_by_size,
     $find_duplicates, $trash_collect, $samples,
-    $move,            $remove,        $help
+    $move,            $remove,        $help,
+    $commit
 );
 
+$commit          = 1 if ( grep /--commit|-c/,                           @ARGV );
 $verbose         = 1 if ( grep /--verbose|-v/,                          @ARGV );
 $show_list       = 1 if ( grep /--list|-l/,                             @ARGV );
 $sort_by_size    = 1 if ( grep /--sort_by_size|--size_sort|--size/,     @ARGV );
@@ -29,11 +29,7 @@ $trash_collect   = 1 if ( grep /--trash_collect|--trash|-t/,            @ARGV );
 $find_samples    = 1 if ( grep /--find_samples|--samples|-s$/,          @ARGV );
 $remove          = 1 if ( grep /--remove|--rm|--del|--delete|--commit/, @ARGV );
 $move            = 1 if ( grep /--move|--relocate/,                     @ARGV );
-$help = 1 if ( grep /--help|-h/, @ARGV or !defined @ARGV );
-
-print Dumper \@ARGV;
-print "\$help -> $help\n";
-print "\$find_samples -> $find_samples\n";
+$help = 1 if ( grep /--help|-h/, @ARGV || defined !@ARGV );
 
 _print_eom() if defined $help;
 
@@ -115,18 +111,29 @@ if ($show_list) {
     }
 }
 
-if ($find_samples) {
-    my $total_size = 0;
-    print "\n"
-      . 'Total Sample Files: '
-      . scalar @{ $videos->{'sample_list'} } . "\n";
-    foreach my $sample ( @{ $videos->{'sample_list'} } ) {
-        $total_size += $sample->{'size'};
-    }
-    print 'Total Sample Size: ' . _in_gigs($total_size) . " GB\n\n";
+if ($find_samples && !$remove ) {
+    _parse_file_size();
 }
 
-if ($find_duplicates) {
+if ( $remove ) {
+    print "\n\t\tDUPLICATES FLAGGED FOR REMOVAL!!!\n\n";
+    if ( $find_samples ) {
+        if ( $verbose ) {
+            foreach $sample ( @{ $videos->{'sample_list'} } ) {
+                print $sample->{'path'} ."\n";
+            }
+        }
+        if ( $commit ) {
+            foreach my $sample ( @{ $videos->{'sample_list'} } ) {
+                print "----> \unlink( $sample->{'path'})\n";
+                unlink( $sample->{'path'});
+            }
+        }
+    }
+    _parse_file_size();
+}
+
+if ($find_duplicates && !$remove ) {
     foreach my $video ( @{ $videos->{'duplicates'} } ) {
         $video->{'size_gb'} = in_gigs( $video->{'size'} );
         if ($verbose) {
@@ -166,6 +173,17 @@ sub _in_gigs {
     return $gigs;
 }
 
+sub _parse_file_size {
+    my $total_size = 0;
+    print "\n"
+    . 'Total Sample Files: '
+    . scalar @{ $videos->{'sample_list'} } . "\n";
+    foreach my $sample ( @{ $videos->{'sample_list'} } ) {
+        $total_size += $sample->{'size'};
+    }
+    print 'Total Sample Size: ' . _in_gigs($total_size) . " GB\n\n";
+}
+
 sub _print_eom {
     print "\t$!\n";
     print "--list|-l - Print the file list.\n";
@@ -193,11 +211,6 @@ sub _sort_by_size {
     }
     return @sorted;
 }
-
-package Video;
-use strict;
-use warnings;
-use Data::Dumper;
 
 sub new {
     my ( $class, $args ) = @_;
