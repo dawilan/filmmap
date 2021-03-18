@@ -6,7 +6,7 @@ package Video;
 use File::Find;
 use Data::Dumper;
 
-my @dirs = qw( /HGST1/tv /media1/tv );    ## DEBUG
+my @dirs = qw( /HGST1/tv /media1/tv /media2/movies/ );    ## DEBUG
 
 my $trashbin = '/media/trashvbin/';
 
@@ -93,12 +93,7 @@ if ($sort_by_size) {
 }
 
 if ($find_duplicates) {
-    print "\n";
-    print 'Number of Duplicates: ' . scalar @{ $videos->{'duplicates'} } . "\n";
-    printf "Gigs of Duplicates: %.2f\n",
-      $videos->{'total_duplicate_size'} / ( 1024 * 1024 * 1024 )
-      if $verbose;
-    print "\n";
+    _print_duplicate_size();
 }
 
 if ($trash_collect) {
@@ -135,9 +130,9 @@ if ( $remove ) {
 
 if ($find_duplicates && !$remove ) {
     foreach my $video ( @{ $videos->{'duplicates'} } ) {
-        $video->{'size_gb'} = in_gigs( $video->{'size'} );
+        $video->{'size_gb'} = _in_gigs( $video->{'size'} );
         if ($verbose) {
-            print Dumper $video;
+            print Dumper $video->{'path'};
         }
         else {
             $video->{'size_gb'} = in_gigs( $video->{'size'} );
@@ -149,11 +144,16 @@ if ($find_duplicates && !$remove ) {
 sub is_duplicate {
     my ($video) = @_;
 
-    my $regex = qr/\.\d($extension_regex)/;
-    if ( $video->{'name'} =~ $regex ) {
+    my $regex = qr/\d\.\d($extension_regex)/;
+    if ( $video->{'name'} =~ $regex && $video->{'name'} !~ /5\.1/ ) {
         push( @{ $videos->{'duplicates'} }, $video );
         $videos->{'total_duplicate_size'} += $video->{'size'};
     }
+}
+
+if ( $find_duplicates && $remove ) {
+    my @d = map{ print "Removing $_->{'path'}\n" } @{ $videos->{'duplicates'} } if $verbose;
+    my @d = map{ unlink $_->{'path'} } @{ $videos->{'duplicates'} } if $commit ;
 }
 
 sub _cli_rinse {
@@ -171,6 +171,15 @@ sub _in_gigs {
     my $gigs;
     $gigs = sprintf "%.2f", $bytes / ( 1024 * 1024 * 1024 );
     return $gigs;
+}
+
+sub _print_duplicate_size{
+    print "\n";
+    print 'Number of Duplicates: ' . scalar @{ $videos->{'duplicates'} } . "\n";
+    printf "Gigs of Duplicates: %.2f\n",
+    $videos->{'total_duplicate_size'} / ( 1024 * 1024 * 1024 )
+    if $verbose;
+    print "\n";
 }
 
 sub _parse_file_size {
