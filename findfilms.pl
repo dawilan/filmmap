@@ -6,13 +6,13 @@ package Video;
 use File::Find;
 use Data::Dumper;
 
-my @dirs = qw( /HGST1/tv /media1/tv /media2/movies/ );    ## DEBUG
+my @dirs = qw( /HGST1/tv /media1/tv /media2/tv );    ## DEBUG
 
 my $trashbin = '/media/trashvbin/';
 
 my $videos = {};
 
-my $extension_regex = qr/\.mkv$|\.mp4$|\.avi$|\.ts$|\.webm$/;
+my $extension_regex = qr/.(mkv|m4v|mp4|flv|avi|ts|webm|mpg|txt|nfo|sub|idx)$/;
 my (
     $show_list,       $verbose,       $sort_by_size,
     $find_duplicates, $trash_collect, $samples,
@@ -97,7 +97,14 @@ if ($find_duplicates) {
 }
 
 if ($trash_collect) {
-    print Dumper $videos->{'trash_list'};
+    foreach $video ( @{ $videos->{'trash_list'} } ) {
+        if ( $remove ) {
+            print "[DELETING TRASH FILE]: $video->{path}\n";
+            unlink( $video->{path} );
+        } else {
+            print "[TRASH IDENTIFIED]: $video->{path}\n";
+        }
+    }
 }
 
 if ($show_list) {
